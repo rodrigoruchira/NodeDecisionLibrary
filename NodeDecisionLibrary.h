@@ -8,7 +8,6 @@
 #include <functional>
 #include <queue>
 #include <Arduino.h>
-#include <functional>
 #include <chrono> 
 
 class NodeDecisionLibrary
@@ -22,8 +21,11 @@ public:
     void setCallback(std::function<void(int, bool)> callback);  
     void processPendingChanges();
     void setDebounceDuration(unsigned long duration);
+    int getVersion();
+   static bool convertToBool(const std::string &value); 
 
 private:
+    int version =1;
     struct InputData
     {
         int id;
@@ -64,16 +66,18 @@ private:
     std::map<int, std::string> deviceValues;
     std::function<void(int, bool)> callback;
     std::map<int, std::function<bool(const std::vector<bool> &)>> nodeLogicMap;
+    std::map<int, std::function<double(const std::vector<double> &)>> mathNodeMap;
     std::map<int, unsigned long> lastTriggerTime; 
     std::map<int, bool> pendingValues;           
 
     bool debugEnabled = false;
-    unsigned long debounceDuration = 10000;       // 10 seconds debounce duration (in milliseconds)
+    unsigned long debounceDuration = 1000;       // 1 seconds debounce duration (in milliseconds)
 
     std::vector<int> topologicalSort(int deviceId);
     bool evaluateNodeInput(int deviceId, int targetNodeId);
     void debugPrint(const char *format, ...);
     void processDeviceChange(int deviceId, bool newValue);  
+   
     
 };
 

@@ -3,16 +3,54 @@
 #include <queue>
 #include <set>
 
-
 // Constructor
 NodeDecisionLibrary::NodeDecisionLibrary()
 {
+    // Boolean Logic Nodes
+    nodeLogicMap[1] = [](const std::vector<bool> &inputs) { return !inputs[0]; }; // NOT
+    nodeLogicMap[2] = [](const std::vector<bool> &inputs) { return inputs[0] && inputs[1]; }; // AND
+    nodeLogicMap[3] = [](const std::vector<bool> &inputs) { return inputs[0] || inputs[1]; }; // OR
+    nodeLogicMap[4] = [](const std::vector<bool> &inputs) { return inputs[0] ^ inputs[1]; }; // XOR
+    nodeLogicMap[5] = [](const std::vector<bool> &inputs) { return !(inputs[0] || inputs[1]); }; // NOR
+    nodeLogicMap[6] = [](const std::vector<bool> &inputs) { return !(inputs[0] && inputs[1]); }; // NAND
+    nodeLogicMap[7] = [](const std::vector<bool> &inputs) { return !(inputs[0] ^ inputs[1]); }; // XNOR
 
-    nodeLogicMap[1] = [](const std::vector<bool> &inputs)    { return !inputs[0]; }; // NOT
-    nodeLogicMap[2] = [](const std::vector<bool> &inputs)    { return inputs[0] && inputs[1]; }; // AND
-    nodeLogicMap[3] = [](const std::vector<bool> &inputs)    { return inputs[0] || inputs[1]; }; // OR
-    nodeLogicMap[4] = [](const std::vector<bool> &inputs)    { return inputs[0] ^ inputs[1]; }; // XOR
-    nodeLogicMap[28] = [](const std::vector<bool> &inputs)    { return inputs[0]; }; // Final Node
+    // Mathematical Nodes (Function)
+    mathNodeMap[8] = [](const std::vector<double> &inputs) { return inputs[0] + inputs[1]; }; // ADD
+    mathNodeMap[9] = [](const std::vector<double> &inputs) { return inputs[0] - inputs[1]; }; // SUBTRACT
+    mathNodeMap[10] = [](const std::vector<double> &inputs) { return inputs[0] * inputs[1]; }; // MULTIPLY
+    mathNodeMap[11] = [](const std::vector<double> &inputs) { return inputs[1] != 0 ? inputs[0] / inputs[1] : 0; }; // DIVIDE (Avoid Zero Division)
+    mathNodeMap[12] = [](const std::vector<double> &inputs) { return pow(inputs[0], inputs[1]); }; // POWER
+    mathNodeMap[13] = [](const std::vector<double> &inputs) { return log(inputs[0]); }; // LOGARITHM
+    mathNodeMap[14] = [](const std::vector<double> &inputs) { return sqrt(inputs[0]); }; // SQUARE ROOT
+    mathNodeMap[15] = [](const std::vector<double> &inputs) { return fabs(inputs[0]); }; // ABSOLUTE
+    mathNodeMap[16] = [](const std::vector<double> &inputs) { return exp(inputs[0]); }; // EXPONENT
+
+    // Comparison Nodes (Return Boolean)
+    mathNodeMap[17] = [](const std::vector<double> &inputs) { return std::min(inputs[0], inputs[1]); }; // MIN
+    mathNodeMap[18] = [](const std::vector<double> &inputs) { return std::max(inputs[0], inputs[1]); };// MAX
+    mathNodeMap[19] = [](const std::vector<double> &inputs) { 
+        Serial.printf("LESS THAN %f: < %f\n", inputs[0] , inputs[1]);  
+        return (inputs[0] < inputs[1]) ? 1.0 : 0.0; 
+    }; // LESS THAN
+
+    mathNodeMap[20] = [](const std::vector<double> &inputs) { 
+        Serial.printf("GREATER THAN %f: > %f\n", inputs[0] , inputs[1]); 
+        return (inputs[0] > inputs[1]) ? 1.0 : 0.0; 
+    }; // GREATER THAN
+    mathNodeMap[21] = [](const std::vector<double> &inputs) { return (inputs[0] <= inputs[1]) ? 1.0 : 0.0; }; // LESS THAN OR EQUAL
+    mathNodeMap[22] = [](const std::vector<double> &inputs) { return (inputs[0] >= inputs[1]) ? 1.0 : 0.0; }; // GREATER THAN OR EQUAL
+    mathNodeMap[23] = [](const std::vector<double> &inputs) { return (inputs[0] == inputs[1]) ? 1.0 : 0.0; }; // EQUAL
+    mathNodeMap[24] = [](const std::vector<double> &inputs) { return (inputs[0] != inputs[1]) ? 1.0 : 0.0; }; // NOT EQUAL
+
+
+    // Rounding Nodes (Function)
+    mathNodeMap[25] = [](const std::vector<double> &inputs) { return round(inputs[0]); }; // ROUND
+    mathNodeMap[26] = [](const std::vector<double> &inputs) { return floor(inputs[0]); }; // FLOOR
+    mathNodeMap[27] = [](const std::vector<double> &inputs) { return ceil(inputs[0]); }; // CEIL
+
+    nodeLogicMap[28] = [](const std::vector<bool> &inputs)
+    { return inputs[0]; }; // Final Node
 }
 
 void NodeDecisionLibrary::isDebug(bool enabled)
@@ -60,7 +98,14 @@ bool NodeDecisionLibrary::decodeLogicData(const String &jsonPayload, int deviceI
             InputData inputData;
             inputData.id = input["id"];
             inputData.dataType = input["dt"].as<std::string>();
-            inputData.data = "null"; // Initialize with null
+            if (input.containsKey("d") && !input["d"].isNull())
+            {
+                inputData.data = input["d"].as<std::string>();
+            }
+            else
+            {
+                inputData.data = "null";
+            }
             nodeData.inputs.push_back(inputData);
         }
 
@@ -78,21 +123,25 @@ bool NodeDecisionLibrary::decodeLogicData(const String &jsonPayload, int deviceI
     }
 
     deviceNodes[deviceId] = nodesForDevice;
-     // Collect all valid input and output IDs
+    // Collect all valid input and output IDs
     std::set<int> validInputIds;
     std::set<int> validOutputIds;
 
-    for (const auto &node : nodesForDevice) {
-        for (const auto &input : node.inputs) {
+    for (const auto &node : nodesForDevice)
+    {
+        for (const auto &input : node.inputs)
+        {
             validInputIds.insert(input.id);
         }
-        for (const auto &output : node.outputs) {
+        for (const auto &output : node.outputs)
+        {
             validOutputIds.insert(output.id);
         }
     }
 
     std::vector<RelationshipData> relationshipsForDevice;
-    for (JsonObject relationship : relationshipsArray) {
+    for (JsonObject relationship : relationshipsArray)
+    {
         RelationshipData relationshipData;
         relationshipData.id = relationship["id"];
         relationshipData.inputId = relationship["i"];
@@ -100,9 +149,12 @@ bool NodeDecisionLibrary::decodeLogicData(const String &jsonPayload, int deviceI
         relationshipData.configId = relationship["c"];
 
         if (validInputIds.count(relationshipData.inputId) > 0 &&
-            validOutputIds.count(relationshipData.outputId) > 0) {
+            validOutputIds.count(relationshipData.outputId) > 0)
+        {
             relationshipsForDevice.push_back(relationshipData);
-        } else {
+        }
+        else
+        {
             debugPrint("Invalid relationship found and removed: ID %d\n", relationshipData.id);
         }
     }
@@ -114,13 +166,13 @@ bool NodeDecisionLibrary::decodeLogicData(const String &jsonPayload, int deviceI
 
 std::vector<int> NodeDecisionLibrary::topologicalSort(int deviceId)
 {
-    std::map<int, std::vector<int>> graph; 
-    std::map<int, int> inDegree;           
-    std::vector<int> sortedOrder;     
+    std::map<int, std::vector<int>> graph;
+    std::map<int, int> inDegree;
+    std::vector<int> sortedOrder;
 
     auto &relationships = deviceRelationships[deviceId];
     auto &nodes = deviceNodes[deviceId];
-  
+
     std::map<int, int> connectionToNodeMap;
     for (const auto &node : nodes)
     {
@@ -136,12 +188,12 @@ std::vector<int> NodeDecisionLibrary::topologicalSort(int deviceId)
 
     for (const auto &relationship : relationships)
     {
-        int inputNode = connectionToNodeMap[relationship.inputId];   
-        int outputNode = connectionToNodeMap[relationship.outputId]; 
+        int inputNode = connectionToNodeMap[relationship.inputId];
+        int outputNode = connectionToNodeMap[relationship.outputId];
 
-        graph[outputNode].push_back(inputNode); 
-        inDegree[inputNode]++;                 
-        inDegree[outputNode];                  
+        graph[outputNode].push_back(inputNode);
+        inDegree[inputNode]++;
+        inDegree[outputNode];
     }
 
     std::queue<int> zeroInDegree;
@@ -180,7 +232,7 @@ std::vector<int> NodeDecisionLibrary::topologicalSort(int deviceId)
         debugPrint("Error: Graph has cycles, cannot perform topological sort.\n");
         return {};
     }
- 
+
     debugPrint("Topological sort completed. Sorted order:");
     for (int nodeId : sortedOrder)
     {
@@ -196,13 +248,14 @@ bool NodeDecisionLibrary::evaluateNodeInput(int deviceId, int targetNodeId)
     auto &nodes = deviceNodes[deviceId];
     auto &relationships = deviceRelationships[deviceId];
     std::map<int, std::string> calculatedOutputValues;
-    
+
     std::function<void(int)> calculateNodeValues = [&](int nodeId)
     {
         if (calculatedOutputValues.find(nodeId) != calculatedOutputValues.end())
         {
             return;
         }
+
         NodeData *node = nullptr;
         for (auto &n : nodes)
         {
@@ -218,30 +271,42 @@ bool NodeDecisionLibrary::evaluateNodeInput(int deviceId, int targetNodeId)
         std::vector<std::string> inputValues;
         for (auto &input : node->inputs)
         {
-            std::string inputValue = input.data; 
+            std::string inputValue = input.data; // Default value
+
+            bool hasRelationship = false;
             for (const auto &relationship : relationships)
             {
                 if (relationship.inputId == input.id)
                 {
+                    hasRelationship = true;
                     for (const auto &otherNode : nodes)
                     {
                         for (const auto &output : otherNode.outputs)
                         {
                             if (output.id == relationship.outputId)
                             {
-                                calculateNodeValues(otherNode.id); 
+                                calculateNodeValues(otherNode.id);
                                 inputValue = calculatedOutputValues[output.id];
-                                input.data = inputValue; 
+                                input.data = inputValue;
                             }
                         }
                     }
                 }
             }
+
+            // If no relationship exists, keep the default value
+            if (!hasRelationship)
+            {
+                Serial.printf(".................................Node ID: %d, Using default value for input ID: %d -> %s\n", nodeId, input.id, inputValue.c_str());
+            }
+
             inputValues.push_back(inputValue);
         }
 
+        // Handle direct device values
         if (node->availableId == 30)
-        { 
+        {
+             Serial.printf(".................Handle direct device values............Node ID: %d  availableId............: %d \n", targetNodeId, node->availableId);
             for (auto &output : node->outputs)
             {
                 if (deviceValues.find(output.deviceId) != deviceValues.end())
@@ -251,20 +316,31 @@ bool NodeDecisionLibrary::evaluateNodeInput(int deviceId, int targetNodeId)
                 }
             }
         }
+        // Handle Final Node
         else if (node->availableId == 28)
-        { 
+        {
+             Serial.printf(".................Handle Final Node...........Node ID: %d  availableId............: %d \n", targetNodeId, node->availableId);
+
             if (!node->inputs.empty())
             {
-                calculatedOutputValues[node->id] = node->inputs[0].data;
+               bool booleanValue = convertToBool(node->inputs[0].data);
+                calculatedOutputValues[node->id] = booleanValue ? "true" : "false";
             }
         }
+        // Boolean Logic Nodes
         else if (nodeLogicMap.find(node->availableId) != nodeLogicMap.end())
-        { 
+        {
+            Serial.printf(".................Boolean Logic Nodes............Node ID: %d  availableId............: %d \n", targetNodeId, node->availableId);
+
             std::vector<bool> boolInputs;
             for (const auto &val : inputValues)
             {
-                boolInputs.push_back(val == "true");
+                std::string lowerVal = val;
+                std::transform(lowerVal.begin(), lowerVal.end(), lowerVal.begin(), ::tolower);
+
+                boolInputs.push_back(lowerVal == "true" || lowerVal == "1");
             }
+
             bool result = nodeLogicMap[node->availableId](boolInputs);
             std::string resultStr = result ? "true" : "false";
 
@@ -273,6 +349,40 @@ bool NodeDecisionLibrary::evaluateNodeInput(int deviceId, int targetNodeId)
                 output.data = resultStr;
                 calculatedOutputValues[output.id] = resultStr;
             }
+        }
+        // Math / Comparison Nodes
+        else if (mathNodeMap.find(node->availableId) != mathNodeMap.end())
+        {
+            Serial.printf("................. Math / Comparison Nodes............Node ID: %d  availableId............: %d \n", targetNodeId, node->availableId);
+
+            std::vector<double> numericInputs;
+            for (const auto &val : inputValues)
+            {
+                Serial.printf("std::stod(val)  %d:  ................******************........\n", std::stod(val));
+                try
+                {
+                    Serial.printf("std::stod(val)  %d:  ...............................\n", std::stod(val));
+                    numericInputs.push_back(std::stod(val));
+                }
+                catch (...)
+                {
+                    numericInputs.push_back(0.0);
+                }
+            }
+
+            double result = mathNodeMap[node->availableId](numericInputs);
+            std::string resultStr = std::to_string(result);
+            Serial.printf("   result   %d:  ...............................\n",result);
+            for (auto &output : node->outputs)
+            {
+                output.data = resultStr;
+                calculatedOutputValues[output.id] = resultStr;
+            }
+        }
+        else
+        {
+
+            Serial.printf("................. Cant Find Node Function  ............Node ID: %d, availableId............: %d \n", targetNodeId, node->availableId);
         }
     };
 
@@ -287,6 +397,7 @@ bool NodeDecisionLibrary::evaluateNodeInput(int deviceId, int targetNodeId)
             break;
         }
     }
+
     if (targetNode)
     {
         debugPrint("Node ID: %d, Inputs: ", targetNodeId);
@@ -299,16 +410,53 @@ bool NodeDecisionLibrary::evaluateNodeInput(int deviceId, int targetNodeId)
         {
             debugPrint("%s ", output.data.c_str());
         }
-         debugPrint("\n");
+        debugPrint("\n");
     }
 
+    // Return boolean result if target node outputs boolean
     if (targetNode && targetNode->availableId == 28 && !targetNode->inputs.empty())
     {
         return targetNode->inputs[0].data == "true";
     }
 
-    return !targetNode->outputs.empty() &&
-           calculatedOutputValues[targetNode->outputs[0].id] == "true";
+    if (!targetNode->outputs.empty())
+    {
+        std::string resultStr = calculatedOutputValues[targetNode->outputs[0].id];
+
+        // If output is boolean, return boolean result
+        if (resultStr == "true" || resultStr == "false")
+        {
+            return resultStr == "true";
+        }
+    }
+
+    return false;
+}
+
+bool NodeDecisionLibrary::convertToBool(const std::string &value) {
+    Serial.printf("**********........convertToBool  ............Node ID: %s,  \n", value.c_str());
+
+    // Convert string to lowercase
+    std::string lowerValue = value;
+    std::transform(lowerValue.begin(), lowerValue.end(), lowerValue.begin(), ::tolower);
+
+    // Handle string values explicitly
+    if (lowerValue == "true" || lowerValue == "1" || lowerValue == "yes" || lowerValue == "on") {
+        return true;
+    }
+    if (lowerValue == "false" || lowerValue == "0" || lowerValue == "no" || lowerValue == "off") {
+        return false;
+    }
+
+    // Try converting numeric values
+    try {
+        double numericValue = std::stod(value);
+
+         Serial.printf("**********........convertToBool  ....numericValue ....Node ID: %d,  \n", numericValue);
+        return numericValue != 0.0; // Any non-zero value is true
+    } catch (...) {
+        return false; // If conversion fails, assume false
+    }
 }
 
 void NodeDecisionLibrary::processPendingChanges()
@@ -326,7 +474,7 @@ void NodeDecisionLibrary::processPendingChanges()
                 callback(deviceId, newValue);
                 debugPrint("Device ID: %d, Applied Pending Value: %s\n", deviceId, newValue ? "true" : "false");
             }
-            pendingValues.erase(deviceId);   
+            pendingValues.erase(deviceId);
             lastTriggerTime.erase(deviceId);
         }
     }
@@ -336,7 +484,7 @@ void NodeDecisionLibrary::updateDeviceValues(String &valueString)
 {
     debugPrint("Updating Device Values...\n");
     debugPrint("Received JSON:\n");
-    debugPrint(valueString.c_str()); 
+    Serial.print(valueString.c_str());
 
     DynamicJsonDocument doc(16384);
     DeserializationError error = deserializeJson(doc, valueString);
@@ -353,26 +501,37 @@ void NodeDecisionLibrary::updateDeviceValues(String &valueString)
     {
         int deviceId = sensor["deviceId"];
         std::string valueStr;
-
+        std::string valueType="";  
         if (sensor["value"].is<bool>())
         {
             valueStr = sensor["value"].as<bool>() ? "true" : "false";
+            valueType = "bool";
         }
-        else if (sensor["value"].is<int>())
+        else if (sensor["value"].is<float>() || sensor["value"].is<int>() || sensor["value"].is<double>() || sensor["value"].is<JsonVariant>())
         {
-            valueStr = std::to_string(sensor["value"].as<int>());
+            double numValue = sensor["value"].as<double>(); // Read as double
+            valueStr = std::to_string(numValue);
+
+            // Type detection based on numerical value
+            if (numValue == static_cast<int>(numValue))
+                valueType = "int";
+            else
+                valueType = "double";
         }
-        else if (sensor["value"].is<float>())
+        else if (sensor["value"].is<const char *>())
         {
-            valueStr = std::to_string(sensor["value"].as<float>());
+            valueStr = sensor["value"].as<const char *>();
+            valueType = "string";
         }
         else
         {
-            valueStr = sensor["value"].as<std::string>();
+            valueStr = "unknown";
+            valueType = "unknown";
         }
 
         deviceValues[deviceId] = valueStr;
-        debugPrint("Updated deviceValues: Device ID %d -> Value %s\n", deviceId, valueStr.c_str());
+        debugPrint("\n Updated deviceValues: Device ID %d -> Value %s | Type: %s \n",
+                   deviceId, valueStr.c_str(), valueType.c_str());
     }
 
     for (auto it = deviceNodes.begin(); it != deviceNodes.end(); ++it)
@@ -413,18 +572,18 @@ void NodeDecisionLibrary::processDeviceChange(int deviceId, bool newValue)
     if (pendingValues.count(deviceId) > 0 && pendingValues[deviceId] != newValue)
     {
         Serial.printf("Device ID %d: Oscillating state detected. Ignoring intermediate state.\n", deviceId);
-        lastTriggerTime[deviceId] = currentTime; 
-        pendingValues[deviceId] = newValue;     
+        lastTriggerTime[deviceId] = currentTime;
+        pendingValues[deviceId] = newValue;
         return;
-            }
+    }
 
     if (lastTriggerTime.count(deviceId) == 0 || (currentTime - lastTriggerTime[deviceId] >= debounceDuration))
     {
-        lastTriggerTime[deviceId] = currentTime; 
-        pendingValues[deviceId] = newValue;  
+        lastTriggerTime[deviceId] = currentTime;
+        pendingValues[deviceId] = newValue;
         if (callback)
         {
-            callback(deviceId, newValue); 
+            callback(deviceId, newValue);
         }
         Serial.printf("Device ID %d: Callback triggered with value: %s\n", deviceId, newValue ? "true" : "false");
     }
@@ -434,13 +593,16 @@ void NodeDecisionLibrary::processDeviceChange(int deviceId, bool newValue)
                       deviceId, newValue ? "true" : "false");
     }
 }
-void NodeDecisionLibrary::setDebounceDuration(unsigned long duration) {
+void NodeDecisionLibrary::setDebounceDuration(unsigned long duration)
+{
     debounceDuration = duration;
     debugPrint("Debounce duration set to %lu milliseconds.\n", debounceDuration);
 }
 
-
 void NodeDecisionLibrary::setCallback(std::function<void(int, bool)> callbackFunc)
 {
     callback = callbackFunc;
+}
+int NodeDecisionLibrary::getVersion(){
+     return version;
 }
